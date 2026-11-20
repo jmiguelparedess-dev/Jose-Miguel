@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "_macros.html" import score with context %}
+{% block title %}Seguimiento CRM{% endblock %}
+{% block content %}
+<div class="topbar"><div><h1>Seguimiento comercial</h1><p class="sub">Embudo por estado. Cambie el estado desde cada tarjeta o desde la ficha.</p></div></div>
+<div class="kanban">
+{% for status, rows in columns.items() %}
+  <div class="kcol"><h3><span>{{ status }}</span><span>{{ rows|length }}</span></h3>
+  {% for c in rows %}
+    <div class="kcard"><a href="{{ url_for('main.company_detail', cid=c.id) }}#crm">{{ c.name }}</a> {{ score(c.score) }}
+      <div class="small muted">{{ c.city or 'Ciudad pendiente' }}{% if c.next_follow_up %} · seg. {{ c.next_follow_up|fecha }}{% endif %}</div>
+      <form method="post" action="{{ url_for('main.company_status', cid=c.id) }}" class="inline-form">
+        <input type="hidden" name="next" value="{{ url_for('main.crm') }}">
+        <select name="status" onchange="this.form.submit()" class="small">{% for s in CRM_STATUSES %}<option {{ 'selected' if s==status }}>{{ s }}</option>{% endfor %}</select>
+      </form></div>
+  {% endfor %}</div>
+{% endfor %}
+</div>
+<div class="grid g2" style="margin-top:16px">
+  <div class="card"><h2>Seguimientos pendientes</h2>
+    {% if followups %}<ul class="list">{% for a in followups %}<li><span><a href="{{ url_for('main.company_detail', cid=a.company_id) }}#crm">{{ a.company }}</a>
+      <span class="small muted">— {{ a.kind }}{% if a.content %}: {{ a.content|truncate(50) }}{% endif %}</span></span>
+      <span class="actions"><span class="badge {{ 'b-nd' if a.follow_up_date < today else 'b-status' }}">{{ a.follow_up_date|fecha }}</span>
+      <form method="post" action="{{ url_for('main.activity_done', aid=a.id) }}"><input type="hidden" name="next" value="{{ url_for('main.crm') }}"><button class="btn sm">Hecho</button></form></span></li>{% endfor %}</ul>
+    {% else %}<p class="empty">Sin seguimientos pendientes.</p>{% endif %}</div>
+  <div class="card"><h2>Próximas reuniones</h2>
+    {% if meetings %}<ul class="list">{% for a in meetings %}<li><a href="{{ url_for('main.company_detail', cid=a.company_id) }}#crm">{{ a.company }}</a>
+      <span class="small">{{ a.meeting_at|replace('T',' ') }}</span></li>{% endfor %}</ul>
+    {% else %}<p class="empty">Sin reuniones agendadas.</p>{% endif %}</div>
+</div>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% from "_macros.html" import score, company_row_list with context %}
+{% block title %}Panel{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div><h1>Panel de prospección</h1>
+    <p class="sub">Constructoras, desarrolladoras, promotoras inmobiliarias e infraestructura en Bolivia.</p></div>
+  <div class="actions">
+    <a class="btn" href="{{ url_for('main.research') }}">⌕ Buscar nuevas empresas</a>
+    <a class="btn primary" href="{{ url_for('main.company_new') }}">＋ Registrar empresa</a>
+  </div>
+</div>
+
+<div class="grid g4">
+  <div class="card kpi"><div class="v">{{ total }}</div><div class="l">Empresas registradas</div></div>
+  <div class="card kpi accent"><div class="v">{{ priority|length }}</div><div class="l">Prospectos prioritarios (≥70)</div></div>
+  <div class="card kpi"><div class="v">{{ (by_status.get('Pendiente de contacto',0)) }}</div><div class="l">Pendientes de contacto</div></div>
+  <div class="card kpi"><div class="v">{{ by_status.get('Reunión solicitada',0) }}</div><div class="l">Reuniones solicitadas</div></div>
+  <div class="card kpi"><div class="v">{{ by_status.get('Reunión confirmada',0) + by_status.get('Reunión realizada',0) }}</div><div class="l">Reuniones confirmadas / realizadas</div></div>
+  <div class="card kpi"><div class="v">{{ by_status.get('Cliente',0) }}</div><div class="l">Clientes</div></div>
+  <div class="card kpi"><div class="v">{{ n_incomplete }}</div><div class="l">Fichas incompletas</div></div>
+  <div class="card kpi"><div class="v">{{ changes_week }}</div><div class="l">Cambios en 7 días</div>
+    <div class="small muted">Última actualización semanal: {{ last_weekly|fecha }}</div></div>
+</div>
+
+<div class="grid g2">
+  <div class="card"><h2>Empresas por departamento</h2>
+    {% set mx = (by_city|map(attribute='n')|max) if by_city else 1 %}
+    <div class="bars">{% for r in by_city %}
+      <div class="row"><a class="small" href="{{ url_for('main.companies', department=r.k if r.k!='Pendiente' else None) }}">{{ r.k }}</a>
+        <div class="track"><div class="fill" style="width:{{ (100*r.n/mx)|round }}%"></div></div><b>{{ r.n }}</b></div>
+    {% else %}<p class="empty">Sin datos todavía.</p>{% endfor %}</div>
+  </div>
+  <div class="card"><h2>Empresas por sector</h2>
+    {% set mx2 = (by_sector|map(attribute='n')|max) if by_sector else 1 %}
+    <div class="bars">{% for r in by_sector %}
+      <div class="row"><a class="small" href="{{ url_for('main.companies', sector=r.k if r.k!='Pendiente' else None) }}">{{ r.k }}</a>
+        <div class="track"><div class="fill alt" style="width:{{ (100*r.n/mx2)|round }}%"></div></div><b>{{ r.n }}</b></div>
+    {% else %}<p class="empty">Sin datos todavía.</p>{% endfor %}</div>
+  </div>
+</div>
+
+<div class="grid g3">
+  <div class="card"><h2>Prospectos prioritarios</h2>{{ company_row_list(priority, 'Aún no hay empresas con potencial alto.') }}</div>
+  <div class="card"><h2>Contactos pendientes</h2>{{ company_row_list(pending_contact, 'No hay contactos pendientes.') }}</div>
+  <div class="card"><h2>Reuniones solicitadas / confirmadas</h2>{{ company_row_list(meetings, 'Sin reuniones en curso.') }}</div>
+  <div class="card"><h2>Información incompleta <a class="small" href="{{ url_for('main.companies', incomplete=1) }}">ver todas</a></h2>
+    {{ company_row_list(incomplete, 'Todas las fichas están completas.') }}</div>
+  <div class="card"><h2>Investigadas recientemente</h2>
+    {% if recent %}<ul class="list">{% for c in recent %}<li><a href="{{ url_for('main.company_detail', cid=c.id) }}">{{ c.name }}</a>
+      <span class="muted small">{{ c.last_researched_at|fecha(true) }}</span></li>{% endfor %}</ul>
+    {% else %}<p class="empty">Ninguna todavía.</p>{% endif %}</div>
+  <div class="card"><h2>Seguimientos (próximos 7 días)</h2>
+    {% if followups %}<ul class="list">{% for a in followups %}<li><span><a href="{{ url_for('main.company_detail', cid=a.company_id) }}#crm">{{ a.company }}</a>
+      <span class="small muted">— {{ a.kind }}{% if a.content %}: {{ a.content|truncate(40) }}{% endif %}</span></span>
+      <span class="badge {{ 'b-nd' if a.follow_up_date < today else 'b-status' }}">{{ a.follow_up_date|fecha }}</span></li>{% endfor %}</ul>
+    {% else %}<p class="empty">Sin seguimientos próximos.</p>{% endif %}</div>
+</div>
+
+<div class="card"><h2>Noticias y proyectos detectados recientemente</h2>
+  {% if news_recent %}<div class="table-wrap"><table><tr><th>Empresa</th><th>Titular</th><th>Medio</th><th>Fecha</th><th>Categorías</th></tr>
+  {% for n in news_recent %}<tr><td><a href="{{ url_for('main.company_detail', cid=n.company_id) }}#actividad">{{ n.company }}</a></td>
+    <td><a href="{{ n.url }}" target="_blank" rel="noopener">{{ n.title }}</a></td><td>{{ n.publisher or '—' }}</td>
+    <td>{{ n.published_at|fecha }}</td><td class="small">{{ n.categories or '' }}</td></tr>{% endfor %}</table></div>
+  {% else %}<p class="empty">Aún no se registraron noticias. Ejecute una búsqueda en «Investigación».</p>{% endif %}
+</div>
+{% endblock %}

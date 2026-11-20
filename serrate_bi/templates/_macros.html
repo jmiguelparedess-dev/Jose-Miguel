@@ -1,0 +1,29 @@
+{% macro conf_badge(level) -%}
+  {%- if level == 'verificado' -%}<span class="badge b-verificado" title="{{ CONFIDENCE_HELP['verificado'] }}">Verificado</span>
+  {%- elif level == 'probable' -%}<span class="badge b-probable" title="{{ CONFIDENCE_HELP['probable'] }}">Probable</span>
+  {%- else -%}<span class="badge b-nd" title="{{ CONFIDENCE_HELP['no disponible'] }}">No disponible</span>{%- endif -%}
+{%- endmacro %}
+
+{% macro score(v) -%}
+  {%- if v is none -%}<span class="score s-none">—</span>
+  {%- else -%}<span class="score {{ 's-high' if v >= 70 else 's-mid' if v >= 40 else 's-low' }}">{{ v }}</span>{%- endif -%}
+{%- endmacro %}
+
+{% macro val(v) -%}{% if v %}{{ v }}{% else %}<span class="pending">Pendiente</span>{% endif %}{%- endmacro %}
+
+{% macro link(v) -%}
+  {%- if v -%}<a href="{{ v if v.startswith('http') else 'https://' ~ v }}" target="_blank" rel="noopener">{{ v | replace('https://','') | replace('http://','') | truncate(48, True) }}</a>
+  {%- else -%}<span class="pending">Pendiente</span>{%- endif -%}
+{%- endmacro %}
+
+{% macro source(url, title, stype) -%}
+  {%- if url -%}<a href="{{ url }}" target="_blank" rel="noopener" title="{{ title or url }}">{{ (stype ~ ': ') if stype }}{{ url | replace('https://','') | replace('http://','') | truncate(40, True) }}</a>
+  {%- elif title -%}{{ title }}{%- else -%}<span class="muted">—</span>{%- endif -%}
+{%- endmacro %}
+
+{% macro company_row_list(rows, empty) %}
+  {% if rows %}<ul class="list">
+  {% for c in rows %}<li><a href="{{ url_for('main.company_detail', cid=c.id) }}">{{ c.name }}</a>
+    <span class="actions"><span class="muted small">{{ c.city or '' }}</span>{{ score(c.score) }}</span></li>{% endfor %}
+  </ul>{% else %}<p class="empty">{{ empty }}</p>{% endif %}
+{% endmacro %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Investigación{% endblock %}
+{% block content %}
+<div class="topbar"><div><h1>Investigación automática</h1>
+  <p class="sub">Busca empresas bolivianas y proyectos en fuentes públicas. Los datos sin fuente se descartan y lo no encontrado queda como «Pendiente». Los duplicados se detectan por nombre normalizado y dominio web.</p></div></div>
+
+<div class="grid g2">
+<form class="card" data-job method="post" action="{{ url_for('main.research_discover') }}">
+  <h2>Buscar nuevas empresas</h2>
+  <div class="form-grid">
+    <div class="full"><div class="small muted">Ciudades prioritarias</div>
+      <div class="check-group">{% for c in ['Santa Cruz','La Paz','Cochabamba','Sucre','Tarija','Oruro','Potosí','El Alto','Trinidad'] %}
+        <label><input type="checkbox" name="cities" value="{{ c }}" {{ 'checked' if c in ['Santa Cruz','La Paz','Cochabamba'] }}> {{ c }}</label>{% endfor %}</div></div>
+    <label class="full">Otras ciudades (separadas por coma)<input name="other_cities" placeholder="Montero, Warnes, Quillacollo"></label>
+    <div class="full"><div class="small muted">Sectores</div>
+      <div class="check-group">{% for s in SECTORS %}<label><input type="checkbox" name="sectors" value="{{ s }}" checked> {{ s }}</label>{% endfor %}</div></div>
+    <label class="full">Búsqueda adicional (opcional)<input name="extra_query" placeholder="p. ej. licitación hospital Santa Cruz 2026, condominio Urubó"></label>
+    <label class="check-group"><span><input type="checkbox" name="investigate_new" value="1" checked> Investigar en profundidad las nuevas</span></label>
+    <label>Máximo a investigar<input type="number" name="max_new" value="10" min="0" max="50"></label>
+  </div>
+  <div class="actions" style="margin-top:12px"><button class="btn primary" type="submit">⌕ Iniciar búsqueda</button></div>
+  <p class="small muted">Motor: {% if engine == 'web' or not claude_available %}búsqueda web y noticias (sin clave){% else %}búsqueda web y noticias + búsqueda asistida con Claude{% endif %}. Puede cambiarlo en Configuración.</p>
+</form>
+<div class="card"><h2>Cómo se investiga</h2>
+  <ol class="small">
+    <li><b>Buscadores web</b> (Brave/Google si hay clave, si no DuckDuckGo): sitios propios de empresas del sector.</li>
+    <li><b>Noticias</b> (Google News, Bing News): proyectos, edificios, urbanizaciones, condominios, inversiones, licitaciones y conflictos; se extraen las empresas mencionadas.</li>
+    <li><b>Sitio oficial</b>: páginas de contacto, nosotros y proyectos (respetando robots.txt). Correos, teléfonos y LinkedIn se toman sólo si están publicados.</li>
+    <li><b>Ejecutivos</b>: sólo cuando una fuente vincula explícitamente nombre, cargo y empresa.</li>
+    <li><b>Búsqueda asistida con Claude</b> (opcional): cada dato debe traer URL y cita; se descarta si la URL no proviene de la búsqueda, y se vuelve a comprobar en la página.</li>
+  </ol>
+  <p class="small muted">Nunca se deducen correos por formato (nombre.apellido@…), ni nombres ni teléfonos.</p>
+</div>
+</div>
+
+<div class="card table-wrap"><h2>Historial de trabajos</h2>
+  <table><tr><th>#</th><th>Tipo</th><th>Empresa</th><th>Estado</th><th>Inicio</th><th>Fin</th><th>Resumen</th><th></th></tr>
+  {% for r in runs %}<tr><td>{{ r.id }}</td><td>{{ r.kind }}</td>
+    <td>{% if r.company_id %}<a href="{{ url_for('main.company_detail', cid=r.company_id) }}">{{ r.company }}</a>{% else %}—{% endif %}</td>
+    <td><span class="badge {{ 'b-verificado' if r.status=='terminado' else 'b-nd' if r.status in ('error','interrumpido') else 'b-status' }}">{{ r.status }}</span></td>
+    <td class="small">{{ r.started_at|fecha(true) }}</td><td class="small">{{ r.finished_at|fecha(true) }}</td><td class="small">{{ r.summary or '' }}</td>
+    <td><details><summary class="small">log</summary><pre class="log">{{ r.log }}</pre></details></td></tr>
+  {% else %}<tr><td colspan="8" class="empty">Sin trabajos todavía.</td></tr>{% endfor %}</table>
+</div>
+{% endblock %}

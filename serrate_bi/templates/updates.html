@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Actualizaciones{% endblock %}
+{% block content %}
+<div class="topbar"><div><h1>Actualización y cambios</h1>
+  <p class="sub">Actualización semanal {{ 'activada' if weekly_enabled else 'desactivada' }} · última ejecución: {{ last_weekly|fecha(true) }}</p></div>
+  <form data-job method="post" action="{{ url_for('main.updates_run') }}" class="actions">
+    <label class="small"><input type="checkbox" name="discover_new" value="1" checked> Buscar también empresas nuevas</label>
+    <button class="btn primary" type="submit">↻ Ejecutar actualización ahora</button></form>
+</div>
+<div class="card table-wrap"><h2>Ejecuciones semanales</h2>
+  <table><tr><th>#</th><th>Estado</th><th>Inicio</th><th>Fin</th><th>Resumen</th></tr>
+  {% for r in weekly_runs %}<tr><td>{{ r.id }}</td><td>{{ r.status }}</td><td class="small">{{ r.started_at|fecha(true) }}</td>
+    <td class="small">{{ r.finished_at|fecha(true) }}</td><td class="small">{{ r.summary or '' }}</td></tr>
+  {% else %}<tr><td colspan="5" class="empty">Aún no se ejecutó ninguna actualización semanal.</td></tr>{% endfor %}</table></div>
+<div class="card table-wrap"><h2>Datos modificados, nuevos proyectos y noticias</h2>
+  <table><tr><th>Fecha</th><th>Empresa</th><th>Campo</th><th>Cambio</th><th>Anterior</th><th>Nuevo</th><th>Origen</th></tr>
+  {% for l in changes %}<tr><td class="small">{{ l.changed_at|fecha(true) }}</td>
+    <td><a href="{{ url_for('main.company_detail', cid=l.company_id) }}#historial">{{ l.company }}</a></td>
+    <td>{{ COMPANY_FIELDS.get(l.field) or EXECUTIVE_FIELDS.get(l.field) or l.field }}</td>
+    <td><span class="badge b-muted">{{ l.change_type }}</span></td><td class="small">{{ l.old_value or '—' }}</td>
+    <td class="small">{{ l.new_value or '—' }}</td>
+    <td class="small">{{ l.origin }}{% if l.source_url %} · <a href="{{ l.source_url }}" target="_blank" rel="noopener">fuente</a>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="7" class="empty">Sin cambios registrados.</td></tr>{% endfor %}</table></div>
+{% endblock %}

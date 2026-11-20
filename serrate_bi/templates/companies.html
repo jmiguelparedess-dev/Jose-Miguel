@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "_macros.html" import score, val, link with context %}
+{% block title %}Empresas{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div><h1>Empresas</h1><p class="sub">{{ rows|length }} resultado(s)</p></div>
+  <div class="actions">
+    <a class="btn" href="{{ url_for('main.export_xlsx', **request.args) }}">⤓ Exportar selección a Excel</a>
+    <a class="btn primary" href="{{ url_for('main.company_new') }}">＋ Nueva empresa</a>
+  </div>
+</div>
+<form class="card filters" method="get">
+  <label>Buscar<input name="search" value="{{ f.search or '' }}" placeholder="Nombre o actividad"></label>
+  <label>Ciudad<select name="city"><option value="">Todas</option>
+    {% for c in cities %}<option {{ 'selected' if f.city==c }}>{{ c }}</option>{% endfor %}</select></label>
+  <label>Departamento<select name="department"><option value="">Todos</option>
+    {% for d in DEPARTMENTS %}<option {{ 'selected' if f.department==d }}>{{ d }}</option>{% endfor %}</select></label>
+  <label>Actividad / sector<select name="sector"><option value="">Todos</option>
+    {% for s in SECTORS %}<option {{ 'selected' if f.sector==s }}>{{ s }}</option>{% endfor %}</select></label>
+  <label>Potencial comercial<select name="potential"><option value="">Todos</option>
+    <option value="alto" {{ 'selected' if f.potential=='alto' }}>Alto (≥70)</option>
+    <option value="medio" {{ 'selected' if f.potential=='medio' }}>Medio (40–69)</option>
+    <option value="bajo" {{ 'selected' if f.potential=='bajo' }}>Bajo (&lt;40)</option>
+    <option value="sin" {{ 'selected' if f.potential=='sin' }}>Sin analizar</option></select></label>
+  <label>Estado del contacto<select name="status"><option value="">Todos</option>
+    {% for s in CRM_STATUSES %}<option {{ 'selected' if f.status==s }}>{{ s }}</option>{% endfor %}</select></label>
+  <label>Orden<select name="sort">
+    {% for k, l in [('score','Puntuación'),('name','Nombre'),('recent','Investigación reciente'),('created','Alta reciente'),('follow_up','Próximo seguimiento')] %}
+    <option value="{{ k }}" {{ 'selected' if f.sort==k }}>{{ l }}</option>{% endfor %}</select></label>
+  <label class="check-group"><span><input type="checkbox" name="incomplete" value="1" {{ 'checked' if f.incomplete }}> Sólo incompletas</span></label>
+  <button class="btn primary" type="submit">Filtrar</button>
+  <a class="btn" href="{{ url_for('main.companies') }}">Limpiar</a>
+</form>
+<div class="card table-wrap">
+  <table>
+    <tr><th>Pts.</th><th>Empresa</th><th>Sector</th><th>Ciudad</th><th>Web</th><th>Ejecutivo</th><th>Proy./Not.</th><th>Estado</th><th>Seguimiento</th></tr>
+    {% for c in rows %}
+    <tr>
+      <td>{{ score(c.score) }}</td>
+      <td><a href="{{ url_for('main.company_detail', cid=c.id) }}"><b>{{ c.name }}</b></a>
+        {% if c.activity %}<div class="small muted">{{ c.activity|truncate(70) }}</div>{% endif %}</td>
+      <td>{{ val(c.sector) }}</td><td>{{ val(c.city) }}</td><td class="small">{{ link(c.website) }}</td>
+      <td>{% if c.n_exec %}{{ c.n_exec }}{% else %}<span class="pending">Pendiente</span>{% endif %}</td>
+      <td>{{ c.n_projects }} / {{ c.n_news }}</td>
+      <td><span class="badge b-status">{{ c.crm_status }}</span></td>
+      <td>{{ c.next_follow_up|fecha }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="9" class="empty">No hay empresas con estos filtros. Registre una empresa o ejecute una búsqueda en «Investigación».</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

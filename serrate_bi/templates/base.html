@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Inteligencia Comercial{% endblock %} · Serrate Paz & Asociados</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><b>SERRATE PAZ</b><span>& Asociados · BI</span></div>
+    {% set ep = request.endpoint or '' %}
+    <nav class="nav">
+      <div class="sep">Inteligencia</div>
+      <a href="{{ url_for('main.dashboard') }}" class="{{ 'active' if ep=='main.dashboard' }}">▦ Panel</a>
+      <a href="{{ url_for('main.companies') }}" class="{{ 'active' if ep in ('main.companies','main.company_detail') }}">▤ Empresas</a>
+      <a href="{{ url_for('main.research') }}" class="{{ 'active' if ep=='main.research' }}">⌕ Investigación</a>
+      <div class="sep">Comercial</div>
+      <a href="{{ url_for('main.crm') }}" class="{{ 'active' if ep=='main.crm' }}">◎ Seguimiento CRM</a>
+      <a href="{{ url_for('main.updates') }}" class="{{ 'active' if ep=='main.updates' }}">↻ Actualizaciones</a>
+      <div class="sep">Sistema</div>
+      <a href="{{ url_for('main.company_new') }}" class="{{ 'active' if ep=='main.company_new' }}">＋ Nueva empresa</a>
+      <a href="{{ url_for('main.export_xlsx') }}">⤓ Exportar a Excel</a>
+      <a href="{{ url_for('main.settings') }}" class="{{ 'active' if ep=='main.settings' }}">⚙ Configuración</a>
+    </nav>
+  </aside>
+  <main class="main">
+    {% with msgs = get_flashed_messages(with_categories=true) %}
+      {% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}
+    {% endwith %}
+    <div class="progress" id="progress">
+      <div class="spinner"></div><span id="progress-msg">Trabajando…</span>
+      <a class="btn sm" id="progress-reload" style="display:none" href="javascript:location.reload()">Ver resultados</a>
+    </div>
+    <pre class="log" id="progress-log" style="display:none"></pre>
+    {% block content %}{% endblock %}
+  </main>
+</div>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

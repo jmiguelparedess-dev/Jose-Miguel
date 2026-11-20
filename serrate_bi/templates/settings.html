@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Configuración{% endblock %}
+{% block content %}
+<div class="topbar"><div><h1>Configuración</h1></div></div>
+<div class="grid g2">
+<form class="card" method="post">
+  <h2>Firma de los mensajes</h2>
+  <div class="form-grid">
+    <label>Nombre del abogado<input name="sender_name" value="{{ vals.sender_name }}"></label>
+    <label>Cargo<input name="sender_position" value="{{ vals.sender_position }}" placeholder="Socio"></label>
+    <label>Correo<input name="sender_email" value="{{ vals.sender_email }}"></label>
+    <label>Teléfono<input name="sender_phone" value="{{ vals.sender_phone }}"></label>
+  </div>
+  <h2 style="margin-top:16px">Investigación</h2>
+  <div class="form-grid">
+    <label>Motor<select name="research_engine">
+      <option value="auto" {{ 'selected' if vals.research_engine=='auto' }}>Automático (Claude si hay clave + web)</option>
+      <option value="web" {{ 'selected' if vals.research_engine=='web' }}>Sólo buscadores web y noticias</option>
+      <option value="claude" {{ 'selected' if vals.research_engine=='claude' }}>Web + Claude (requiere clave)</option></select></label>
+    <label>Actualización semanal<select name="weekly_enabled">
+      <option value="1" {{ 'selected' if vals.weekly_enabled=='1' }}>Activada</option>
+      <option value="0" {{ 'selected' if vals.weekly_enabled=='0' }}>Desactivada</option></select></label>
+  </div>
+  <div class="actions" style="margin-top:12px"><button class="btn primary">Guardar</button></div>
+</form>
+<div class="card"><h2>Integraciones (variables de entorno)</h2>
+  <table>
+    <tr><td>ANTHROPIC_API_KEY (Claude: búsqueda asistida y redacción)</td><td>{{ '✔ configurada' if env.ANTHROPIC_API_KEY else '— no configurada' }}</td></tr>
+    <tr><td>Modelo Claude</td><td>{{ model }}</td></tr>
+    <tr><td>BRAVE_API_KEY (Brave Search)</td><td>{{ '✔ configurada' if env.BRAVE_API_KEY else '— no configurada' }}</td></tr>
+    <tr><td>GOOGLE_CSE_KEY + GOOGLE_CSE_CX</td><td>{{ '✔ configurada' if env.GOOGLE_CSE else '— no configurada' }}</td></tr>
+  </table>
+  <p class="small muted">Sin claves, la aplicación usa DuckDuckGo, Google News y Bing News, y lee los sitios oficiales.</p>
+  <h2 style="margin-top:16px">Base de datos</h2>
+  <p class="small">Archivo: <code>{{ db_path }}</code> (SQLite, modo WAL: cada cambio se guarda al instante).</p>
+  <table>{% for t, n in counts.items() %}<tr><td>{{ t }}</td><td>{{ n }}</td></tr>{% endfor %}</table>
+  <p class="small muted">Copia de seguridad: copie el archivo o use «Exportar a Excel».</p>
+</div>
+</div>
+{% endblock %}

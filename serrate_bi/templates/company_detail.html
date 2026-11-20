@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+{% from "_macros.html" import conf_badge, score, val, link, source with context %}
+{% block title %}{{ c.name }}{% endblock %}
+
+{% macro edit_form(entity_type, entity_id, field, current) %}
+<details class="edit"><summary>✎ editar</summary>
+  <form method="post" action="{{ url_for('main.company_field', cid=c.id) }}">
+    <input type="hidden" name="entity_type" value="{{ entity_type }}"><input type="hidden" name="entity_id" value="{{ entity_id }}">
+    <input type="hidden" name="field" value="{{ field }}">
+    <div class="inline-form">
+      {% if field == 'sector' %}<select name="value"><option value="">— vaciar —</option>{% for s in SECTORS %}<option {{ 'selected' if current==s }}>{{ s }}</option>{% endfor %}</select>
+      {% elif field == 'department' %}<select name="value"><option value="">— vaciar —</option>{% for d in DEPARTMENTS %}<option {{ 'selected' if current==d }}>{{ d }}</option>{% endfor %}</select>
+      {% else %}<input name="value" value="{{ current or '' }}" style="min-width:240px">{% endif %}
+      <select name="confidence"><option value="verificado">Verificado</option><option value="probable">Probable</option></select>
+    </div>
+    <div class="inline-form"><input name="source_url" placeholder="URL de la fuente (opcional)" style="min-width:240px">
+      <input name="note" placeholder="Nota / cómo se confirmó"><button class="btn sm primary">Guardar</button></div>
+    <div class="small muted">El valor anterior se conserva en el historial.</div>
+  </form>
+</details>
+{% endmacro %}
+
+{% macro alt_list(alts, field) %}
+  {% for f in alts.get(field, [])[:4] %}
+  <div class="alt">Otro valor encontrado: <b>{{ f.value }}</b> {{ conf_badge(f.confidence) }}
+    · {{ source(f.source_url, f.source_title, None) }} · {{ f.observed_at|fecha }}
+    <form method="post" action="{{ url_for('main.adopt', cid=c.id, fact_id=f.id) }}" style="display:inline">
+      <button class="btn link small">adoptar</button></form></div>
+  {% endfor %}
+{% endmacro %}
+
+{% block content %}
+{% if active_run %}<span data-watch-run="{{ active_run.id }}"></span>{% endif %}
+<div class="topbar">
+  <div>
+    <h1>{{ c.name }} {{ score(c.score) }}</h1>
+    <p class="sub">{{ c.sector or 'Sector pendiente' }} · {{ c.city or 'Ciudad pendiente' }}{% if c.department %} ({{ c.department }}){% endif %}
+      · <span class="badge b-status">{{ c.crm_status }}</span>
+      · Última investigación: {{ c.last_researched_at|fecha(true) }}{% if c.archived %} · <span class="badge b-nd">Archivada</span>{% endif %}</p>
+  </div>
+  <div class="actions">
+    <form data-job method="post" action="{{ url_for('main.company_investigate', cid=c.id) }}">
+      <button class="btn primary" type="submit">⌕ INVESTIGAR MÁS</button></form>
+    <a class="btn accent" href="#contacto" onclick="setTimeout(function(){document.getElementById('gen-form').scrollIntoView()},50)">✉ GENERAR CONTACTO</a>
+    <form method="post" action="{{ url_for('main.company_archive', cid=c.id) }}"><button class="btn">{{ 'Restaurar' if c.archived else 'Archivar' }}</button></form>
+  </div>
+</div>
+
+{% if missing %}
+<div class="card"><h3>Información faltante ({{ missing|length }})</h3>
+  <div class="missing">{% for m in missing %}<span class="badge b-nd">{{ m }}</span>{% endfor %}</div>
+  <p class="small muted" style="margin:8px 0 0">Use INVESTIGAR MÁS para buscar estos datos en fuentes públicas o regístrelos manualmente con su fuente.</p></div>
+{% endif %}
+
+<nav class="tabs">
+  <a href="#datos">Datos</a><a href="#ejecutivos">Ejecutivos ({{ execs|length }})</a><a href="#analisis">Análisis comercial</a>
+  <a href="#proyectos">Proyectos ({{ projects|length }})</a><a href="#actividad">Noticias ({{ news|length }})</a>
+  <a href="#contacto">Contacto ({{ drafts|length }})</a><a href="#crm">Seguimiento</a>
+  <a href="#fuentes">Fuentes ({{ sources|length }})</a><a href="#historial">Historial</a>
+</nav>
+
+<section class="tab" id="tab-datos">
+  <div class="card table-wrap">
+    <div class="legend" style="margin-bottom:8px">{{ conf_badge('verificado') }} {{ CONFIDENCE_HELP['verificado'] }}</div>
+    <div class="legend" style="margin-bottom:12px">{{ conf_badge('probable') }} {{ CONFIDENCE_HELP['probable'] }}</div>
+    <table class="fields">
+      <tr><th>Dato</th><th>Valor</th><th>Confianza</th><th>Fuente</th><th>Verificado</th></tr>
+      {% for field, label in COMPANY_FIELDS.items() %}{% set st = states.get(field) %}
+      <tr>
+        <td>{{ label }}</td>
+        <td>{% if field in ('website','linkedin_url') %}{{ link(c[field]) }}{% elif field=='email' and c.email %}<a href="mailto:{{ c.email }}">{{ c.email }}</a>{% else %}{{ val(c[field]) }}{% endif %}
+          {{ alt_list(alts, field) }}{{ edit_form('company', c.id, field, c[field]) }}</td>
+        <td>{{ conf_badge(st.confidence if st else None) }}{% if st and st.origin=='manual' %}<div class="small muted">manual</div>{% endif %}</td>
+        <td class="small">{% if st %}{{ source(st.source_url, st.source_title, st.source_type) }}{% else %}—{% endif %}</td>
+        <td class="small">{{ st.verified_at|fecha if st else '—' }}</td>
+      </tr>{% endfor %}
+    </table>
+  </div>
+</section>
+
+<section class="tab" id="tab-ejecutivos">
+  {% for e in execs %}{% set es = exec_states[e.id] %}
+  <div class="card table-wrap">
+    <div class="topbar" style="margin-bottom:6px"><h2>{{ e.full_name }} {% if e.is_primary %}<span class="badge b-muted">principal</span>{% endif %}</h2>
+      <form method="post" action="{{ url_for('main.executive_delete', cid=c.id, eid=e.id) }}" onsubmit="return confirm('¿Descartar este ejecutivo? Quedará registrado en el historial.')">
+        <button class="btn sm">Descartar</button></form></div>
+    <table class="fields"><tr><th>Dato</th><th>Valor</th><th>Confianza</th><th>Fuente</th><th>Verificado</th></tr>
+    {% for field, label in EXECUTIVE_FIELDS.items() %}{% set st = es.get(field) %}
+      <tr><td>{{ label }}</td>
+        <td>{% if field=='linkedin_url' %}{{ link(e[field]) }}{% else %}{{ val(e[field]) }}{% endif %}
+          {{ alt_list(exec_alts[e.id], field) }}{{ edit_form('executive', e.id, field, e[field]) }}</td>
+        <td>{{ conf_badge(st.confidence if st else None) }}</td>
+        <td class="small">{% if st %}{{ source(st.source_url, st.source_title, st.source_type) }}{% else %}—{% endif %}</td>
+        <td class="small">{{ st.verified_at|fecha if st else '—' }}</td></tr>
+    {% endfor %}</table>
+  </div>
+  {% else %}<div class="card"><p class="empty">No se identificó al gerente general, CEO, propietario ni socio principal. No se inventan nombres: use INVESTIGAR MÁS o regístrelo con su fuente.</p></div>{% endfor %}
+  <div class="card"><h3>Registrar ejecutivo</h3>
+    <form method="post" action="{{ url_for('main.executive_add', cid=c.id) }}"><div class="form-grid">
+      <label>Nombre completo *<input name="full_name" required></label>
+      <label>Cargo<input name="position" placeholder="Gerente General, CEO, Propietario…"></label>
+      <label>Correo profesional (sólo si es público)<input name="email" type="email"></label>
+      <label>Teléfono<input name="phone"></label>
+      <label>LinkedIn<input name="linkedin_url"></label>
+      <label>Fuente (URL)<input name="source_url"></label>
+      <label>Nota<input name="note"></label>
+      <label>Confianza<select name="confidence"><option value="probable">Probable</option><option value="verificado">Verificado</option></select></label>
+    </div><div class="actions" style="margin-top:10px"><button class="btn primary">Guardar ejecutivo</button></div></form>
+  </div>
+</section>
+
+<section class="tab" id="tab-analisis">
+  {% if a %}
+  <div class="grid g2">
+    <div class="card"><h2>Potencial comercial: {{ a.level }} {{ score(a.score) }}</h2>
+      {% for comp in a.components %}
+      <div class="comp"><span class="small">{{ comp.name }}<br><span class="muted">{{ comp.detail }}</span></span>
+        <div class="bars"><div class="track"><div class="fill" style="width:{{ (100*comp.points/comp.max)|round }}%"></div></div></div>
+        <b class="small">{{ comp.points }}/{{ comp.max }}</b></div>
+      {% endfor %}
+      <p class="small muted">Calculado el {{ a.analyzed_at|fecha(true) }} sobre {{ a.evidence_count }} evidencia(s) documentada(s).</p>
+      <form method="post" action="{{ url_for('main.company_analyze', cid=c.id) }}"><button class="btn sm">Recalcular</button></form>
+    </div>
+    <div class="card"><h2>¿Por qué acercarse?</h2>
+      <p>{{ a.approach.text }}</p>
+      {% if a.approach.evidence_url %}<p class="small">Fuente: <a href="{{ a.approach.evidence_url }}" target="_blank" rel="noopener">{{ a.approach.evidence_url|truncate(70, True) }}</a></p>{% endif %}
+      {% if not a.approach.specific %}<div class="flash warning">Motivo no específico: falta evidencia concreta.</div>{% endif %}
+      <h3 style="margin-top:14px">Riesgos contractuales y comerciales</h3>
+      {% if a.risks %}<ul>{% for r in a.risks %}<li>{{ r }}</li>{% endfor %}</ul>{% else %}<p class="muted">Sin riesgos específicos documentados.</p>{% endif %}
+    </div>
+  </div>
+  <div class="card"><h2>Posibles necesidades jurídicas</h2>
+    <div class="table-wrap"><table><tr><th>Área</th><th>Detalle</th><th>Evidencia</th></tr>
+    {% for n in a.needs %}<tr><td><b>{{ n.area }}</b></td><td>{{ n.detail }}</td><td class="small">{{ n.evidence or '—' }}</td></tr>{% endfor %}
+    </table></div>
+    <p class="small muted">Orientativo: generado con reglas a partir de los datos registrados. Validar criterio jurídico antes de usarlo con el cliente.</p>
+  </div>
+  {% else %}<div class="card"><p class="empty">Aún no se analizó.</p></div>{% endif %}
+</section>
+
+<section class="tab" id="tab-proyectos">
+  <div class="card table-wrap">
+    <table><tr><th>Proyecto</th><th>Tipo</th><th>Ciudad</th><th>Estado</th><th>Confianza</th><th>Fuente</th><th>Fecha</th></tr>
+    {% for p in projects %}<tr><td><b>{{ p.name }}</b>{% if p.description %}<div class="small muted">{{ p.description|truncate(120) }}</div>{% endif %}</td>
+      <td>{{ p.project_type or '—' }}</td><td>{{ p.city or '—' }}</td><td>{{ p.status or '—' }}</td><td>{{ conf_badge(p.confidence) }}</td>
+      <td class="small">{{ source(p.source_url, p.source_title, None) }}</td><td class="small">{{ (p.published_at or p.first_seen_at)|fecha }}</td></tr>
+    {% else %}<tr><td colspan="7" class="empty">Sin proyectos documentados.</td></tr>{% endfor %}</table>
+  </div>
+  <div class="card"><h3>Registrar proyecto</h3>
+    <form method="post" action="{{ url_for('main.project_add', cid=c.id) }}"><div class="form-grid">
+      <label>Nombre *<input name="name" required></label>
+      <label>Tipo<input name="project_type" placeholder="Edificio, condominio, urbanización, obra vial…"></label>
+      <label>Ciudad<input name="city"></label><label>Estado<input name="status" placeholder="Preventa, en ejecución, entregado…"></label>
+      <label>Fuente (URL) *<input name="source_url" required></label><label>Fecha de publicación<input type="date" name="published_at"></label>
+      <label class="full">Descripción<input name="description"></label>
+      <label>Confianza<select name="confidence"><option value="probable">Probable</option><option value="verificado">Verificado</option></select></label>
+    </div><div class="actions" style="margin-top:10px"><button class="btn primary">Guardar proyecto</button></div></form>
+  </div>
+</section>
+
+<section class="tab" id="tab-actividad">
+  <div class="card table-wrap">
+    <table><tr><th>Fecha</th><th>Titular</th><th>Medio</th><th>Categorías</th></tr>
+    {% for n in news %}<tr><td class="small">{{ n.published_at|fecha }}</td>
+      <td><a href="{{ n.url }}" target="_blank" rel="noopener">{{ n.title }}</a>{% if n.summary and n.summary != n.title %}<div class="small muted">{{ n.summary|truncate(160) }}</div>{% endif %}</td>
+      <td>{{ n.publisher or '—' }}</td><td class="small">{{ n.categories or '—' }}</td></tr>
+    {% else %}<tr><td colspan="4" class="empty">Sin noticias registradas.</td></tr>{% endfor %}</table>
+  </div>
+</section>
+
+<section class="tab" id="tab-contacto">
+  <div class="card" id="gen-form"><h2>Generar contacto</h2>
+    <p class="small muted">Se generan borradores basados en hechos con fuente. <b>Nada se envía automáticamente</b>: revise, edite y apruebe; luego envíe desde su correo o LinkedIn y márquelo como enviado.</p>
+    <form method="post" action="{{ url_for('main.company_outreach', cid=c.id) }}" class="inline-form">
+      <label class="small">Destinatario
+        <select name="executive_id"><option value="">{{ 'Ejecutivo principal' if execs else 'Equipo directivo (sin ejecutivo identificado)' }}</option>
+          {% for e in execs %}<option value="{{ e.id }}">{{ e.full_name }}{{ ' — ' ~ e.position if e.position }}</option>{% endfor %}</select></label>
+      {% if claude_available %}<label class="small"><input type="checkbox" name="use_claude" value="1"> Redactar con Claude (sólo con los hechos registrados)</label>{% endif %}
+      <button class="btn accent">✉ GENERAR CONTACTO</button>
+    </form>
+  </div>
+  {% for d in drafts %}
+  <div class="draft">
+    <div class="topbar" style="margin-bottom:0">
+      <div><b>{{ CHANNELS[d.channel] }}</b> <span class="badge {{ 'b-verificado' if d.status=='aprobado' else 'b-status' if d.status=='enviado manualmente' else 'b-muted' }}">{{ d.status }}</span>
+        <span class="small muted">· {{ d.created_at|fecha(true) }} · {{ d.generator }}{% if d.full_name %} · para {{ d.full_name }}{% endif %}</span></div>
+      <div class="actions">
+        <button class="btn sm" data-copy="draft-{{ d.id }}">Copiar</button>
+        {% set basis = d.basis_json|fromjson %}
+        {% if d.channel in ('email','meeting') and d.status in ('aprobado','enviado manualmente') and basis and basis.recipient %}
+          <a class="btn sm" href="mailto:{{ basis.recipient }}?subject={{ (d.subject or '')|urlencode }}&body={{ d.body|urlencode }}">Abrir en mi correo</a>{% endif %}
+        {% if d.status == 'borrador' %}
+          <form method="post" action="{{ url_for('main.draft_update', did=d.id) }}"><input type="hidden" name="status" value="aprobado"><button class="btn sm primary">Aprobar</button></form>
+        {% elif d.status == 'aprobado' and d.channel != 'pitch' %}
+          <form method="post" action="{{ url_for('main.draft_update', did=d.id) }}"><input type="hidden" name="status" value="enviado manualmente"><button class="btn sm primary">Marcar como enviado</button></form>
+        {% endif %}
+        <form method="post" action="{{ url_for('main.draft_update', did=d.id) }}"><input type="hidden" name="status" value="descartado"><button class="btn sm">Descartar</button></form>
+      </div>
+    </div>
+    {% if d.subject %}<div class="small"><b>Asunto:</b> {{ d.subject }}</div>{% endif %}
+    <pre id="draft-{{ d.id }}">{{ d.body }}</pre>
+    {% if basis and basis.recipient and d.channel=='email' %}<div class="small muted">Destinatario sugerido: {{ basis.recipient }}</div>{% endif %}
+    {% if basis and basis.warnings %}<div class="small" style="color:var(--warn)">⚠ {{ basis.warnings|join(' ') }}</div>{% endif %}
+    {% if d.status == 'borrador' %}
+    <details class="edit"><summary>✎ editar texto</summary>
+      <form method="post" action="{{ url_for('main.draft_update', did=d.id) }}">
+        {% if d.subject is not none %}<input name="subject" value="{{ d.subject }}" style="width:100%;margin-bottom:6px">{% endif %}
+        <textarea name="body" rows="10">{{ d.body }}</textarea><button class="btn sm primary">Guardar cambios</button></form></details>
+    {% endif %}
+  </div>
+  {% else %}<p class="empty">Aún no hay borradores.</p>{% endfor %}
+</section>
+
+<section class="tab" id="tab-crm">
+  <div class="grid g2">
+    <div class="card"><h2>Estado comercial</h2>
+      <form method="post" action="{{ url_for('main.company_status', cid=c.id) }}" class="inline-form">
+        <select name="status">{% for s in CRM_STATUSES %}<option {{ 'selected' if c.crm_status==s }}>{{ s }}</option>{% endfor %}</select>
+        <input name="note" placeholder="Comentario (opcional)"><button class="btn primary">Actualizar</button></form>
+      <p class="small muted">Próximo seguimiento: <b>{{ c.next_follow_up|fecha }}</b></p>
+      <h3 style="margin-top:16px">Registrar actividad</h3>
+      <form method="post" action="{{ url_for('main.activity_add', cid=c.id) }}"><div class="form-grid">
+        <label>Tipo<select name="kind">{% for k in ACTIVITY_KINDS if k != 'Cambio de estado' %}<option>{{ k }}</option>{% endfor %}</select></label>
+        <label>Fecha<input type="date" name="activity_date" value="{{ today }}"></label>
+        <label>Reunión (fecha y hora)<input type="datetime-local" name="meeting_at"></label>
+        <label>Fecha de seguimiento<input type="date" name="follow_up_date"></label>
+        <label class="full">Ejecutivo<select name="executive_id"><option value="">—</option>{% for e in execs %}<option value="{{ e.id }}">{{ e.full_name }}</option>{% endfor %}</select></label>
+        <label class="full">Comentario<textarea name="content" rows="3"></textarea></label>
+      </div><div class="actions" style="margin-top:10px"><button class="btn primary">Guardar actividad</button></div></form>
+    </div>
+    <div class="card"><h2>Historial comercial</h2>
+      {% if activities %}<ul class="timeline">{% for act in activities %}
+        <li class="{{ 'done' if act.done }}"><b>{{ act.kind }}</b> <span class="small muted">{{ act.activity_date|fecha }}{% if act.full_name %} · {{ act.full_name }}{% endif %}</span>
+          {% if act.content %}<div>{{ act.content }}</div>{% endif %}
+          {% if act.meeting_at %}<div class="small">Reunión: {{ act.meeting_at|replace('T',' ') }}</div>{% endif %}
+          {% if act.follow_up_date %}<div class="small">Seguimiento: <span class="badge {{ 'b-muted' if act.done else 'b-nd' if act.follow_up_date < today else 'b-status' }}">{{ act.follow_up_date|fecha }}</span>
+            <form method="post" action="{{ url_for('main.activity_done', aid=act.id) }}" style="display:inline"><button class="btn link small">{{ 'reabrir' if act.done else 'marcar hecho' }}</button></form></div>{% endif %}
+        </li>{% endfor %}</ul>
+      {% else %}<p class="empty">Sin actividad registrada.</p>{% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="tab" id="tab-fuentes">
+  <div class="card table-wrap"><table><tr><th>Fuente</th><th>Tipo</th><th>Datos aportados</th><th>Primera consulta</th><th>Última consulta</th></tr>
+    {% for s in sources %}<tr><td>{% if s.url %}<a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.title or s.url|truncate(70, True) }}</a><div class="small muted">{{ s.url|truncate(80, True) }}</div>{% else %}{{ s.title }}{% endif %}</td>
+      <td>{{ s.source_type }}</td><td>{{ s.n_facts }}</td><td class="small">{{ s.first_retrieved_at|fecha(true) }}</td><td class="small">{{ s.last_retrieved_at|fecha(true) }}</td></tr>
+    {% else %}<tr><td colspan="5" class="empty">Sin fuentes.</td></tr>{% endfor %}</table></div>
+  <div class="card"><h3>Investigaciones de esta empresa</h3>
+    {% for r in runs %}<div class="small"><b>#{{ r.id }}</b> {{ r.created_at|fecha(true) }} — {{ r.status }}: {{ r.summary or '' }}</div>
+    {% else %}<p class="empty">Sin investigaciones.</p>{% endfor %}</div>
+</section>
+
+<section class="tab" id="tab-historial">
+  <div class="card table-wrap"><table><tr><th>Fecha</th><th>Campo</th><th>Cambio</th><th>Anterior</th><th>Nuevo</th><th>Confianza</th><th>Origen / fuente</th></tr>
+    {% for l in changes %}<tr><td class="small">{{ l.changed_at|fecha(true) }}</td><td>{{ COMPANY_FIELDS.get(l.field) or EXECUTIVE_FIELDS.get(l.field) or l.field }}{% if l.entity_type=='executive' %} <span class="small muted">(ejecutivo)</span>{% endif %}</td>
+      <td><span class="badge {{ 'b-probable' if l.change_type in ('modificado','valor alternativo','eliminado') else 'b-verificado' if l.change_type=='confianza elevada' else 'b-muted' }}">{{ l.change_type }}</span></td>
+      <td class="small">{{ l.old_value or '—' }}</td><td class="small">{{ l.new_value or '—' }}</td>
+      <td class="small">{{ l.old_confidence or '' }}{% if l.new_confidence %} → {{ l.new_confidence }}{% endif %}</td>
+      <td class="small">{{ l.origin }}{% if l.source_url %} · <a href="{{ l.source_url }}" target="_blank" rel="noopener">fuente</a>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="7" class="empty">Sin cambios.</td></tr>{% endfor %}</table></div>
+</section>
+{% endblock %}

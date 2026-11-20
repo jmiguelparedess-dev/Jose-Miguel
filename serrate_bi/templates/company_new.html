@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Nueva empresa{% endblock %}
+{% block content %}
+<div class="topbar"><div><h1>Registrar empresa</h1>
+  <p class="sub">Sólo el nombre es obligatorio. Los datos que no conozca quedarán como «Pendiente»; no complete campos con suposiciones.</p></div></div>
+<form class="card" method="post">
+  <div class="form-grid">
+    <label class="full">Nombre de la empresa *<input name="name" required></label>
+    <label>Actividad<input name="activity" placeholder="p. ej. Edificios residenciales y oficinas"></label>
+    <label>Sector<select name="sector"><option value="">— Pendiente —</option>{% for s in SECTORS %}<option>{{ s }}</option>{% endfor %}</select></label>
+    <label>Ciudad<input name="city" list="cities"><datalist id="cities">{% for c in cities %}<option>{{ c }}</option>{% endfor %}</datalist></label>
+    <label>Departamento<select name="department"><option value="">— Según ciudad —</option>{% for d in DEPARTMENTS %}<option>{{ d }}</option>{% endfor %}</select></label>
+    <label>Página web<input name="website" placeholder="www.empresa.com.bo"></label>
+    <label>Correo corporativo<input name="email" type="email"></label>
+    <label>Teléfono corporativo<input name="phone"></label>
+    <label>LinkedIn de la empresa<input name="linkedin_url"></label>
+    <label>Fuente (URL)<input name="source_url" placeholder="Dónde obtuvo estos datos"></label>
+    <label>Nota sobre la fuente<input name="source_note" placeholder="p. ej. Tarjeta recibida en evento CADECO"></label>
+    <label>Nivel de confianza<select name="confidence"><option value="probable">Probable</option><option value="verificado">Verificado</option></select></label>
+    <label class="check-group full"><span><input type="checkbox" name="investigate" value="1" checked> Investigar automáticamente al guardar</span></label>
+  </div>
+  <div class="actions" style="margin-top:12px"><button class="btn primary" type="submit">Guardar</button>
+    <a class="btn" href="{{ url_for('main.companies') }}">Cancelar</a></div>
+</form>
+{% endblock %}
