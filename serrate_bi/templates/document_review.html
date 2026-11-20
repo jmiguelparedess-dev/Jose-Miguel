@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ d.filename }}{% endblock %}
+{% block content %}
+<div class="topbar"><div class="title-block" data-wm="documento">
+  <div class="eyebrow">Documento · {{ d.kind }}</div>
+  <h1 style="font-size:28px">{{ d.filename }}</h1>
+  <p class="sub">Subido {{ d.uploaded_at|fecha(true) }}{% if d.extraction_method %} · leído por {{ d.extraction_method }}{% endif %}
+    · <span class="badge {{ 'b-verificado' if d.status=='procesado' else 'b-probable' if d.status in ('requiere OCR','sin datos') else 'b-nd' }}">{{ d.status }}</span>
+    {% if d.company_id %} · <a href="{{ url_for('main.company_detail', cid=d.company_id) }}">{{ d.company }}</a>{% endif %}</p></div>
+  <div class="actions">
+    <a class="btn" href="{{ url_for('main.doc_file', did=d.id) }}" target="_blank">Ver archivo original</a>
+    <form method="post" action="{{ url_for('main.doc_reprocess', did=d.id) }}"><button class="btn">Volver a leer</button></form>
+    <a class="btn" href="{{ url_for('main.docs_list') }}">Volver</a>
+  </div>
+</div>
+{% if d.message %}<div class="flash warning">{{ d.message }}</div>{% endif %}
+{% if d.applied_summary %}<div class="flash success">Ya incorporado ({{ d.applied_at|fecha(true) }}): {{ d.applied_summary }}. Puede volver a aplicarlo; los datos repetidos sólo se reconfirman.</div>{% endif %}
+
+{% if sheet %}
+<form method="post" class="card">
+  <input type="hidden" name="sheet" value="{{ si }}">
+  <div class="topbar" style="margin:0 0 10px"><div><h2>Vista previa de la importación</h2>
+    <p class="small muted">Hoja «{{ sheet.title }}» · {{ sheet.rows|length }} filas · <b>{{ n_new }}</b> empresas nuevas · <b>{{ n_upd }}</b> existentes se actualizan{% if n_skip %} · {{ n_skip }} sin nombre se omiten{% endif %}</p></div>
+    {% if table.sheets|length > 1 %}<div class="actions">{% for s in table.sheets %}<a class="btn sm {{ 'primary' if loop.index0==si }}" href="?sheet={{ loop.index0 }}">{{ s.title }}</a>{% endfor %}</div>{% endif %}
+  </div>
+  <h3>1. Confirme qué representa cada columna</h3>
+  {% if sheet.headers|length > 5 %}<p class="small muted">La planilla tiene {{ sheet.headers|length }} columnas: desplace la tabla hacia la derecha para verlas todas.</p>{% endif %}
+  <div class="table-wrap"><table><tr>{% for h in sheet.headers %}<th>{{ h or '(sin título)' }}</th>{% endfor %}</tr>
+    <tr>{% for h in sheet.headers %}{% set i = loop.index0 %}<td><select name="m{{ i }}">{% for k, lbl in TARGET_LABELS.items() %}<option value="{{ k }}" {{ 'selected' if mapping[i]==k }}>{{ lbl }}</option>{% endfor %}</select></td>{% endfor %}</tr>
+  </table></div>
+  <div class="actions" style="margin:10px 0 16px"><button class="btn" name="action" value="preview">Actualizar vista previa</button></div>
+
+  <h3>2. Revise el resultado</h3>
+  <div class="table-wrap"><table><tr><th>Empresa</th><th>Acción</th><th>Datos que aporta</th></tr>
+  {% for p in preview[:60] %}<tr><td>{{ p.name or '—' }}</td>
+    <td><span class="badge {{ 'b-status' if p.existing_id else 'b-verificado' if p.name else 'b-nd' }}">{{ p.status }}</span></td>
+    <td class="small">{% for f, v in p.fields.items() %}<b>{{ TARGET_LABELS[f] }}:</b> {{ v|truncate(60) }}{{ '; ' if not loop.last }}{% else %}<span class="muted">sin datos adicionales</span>{% endfor %}</td></tr>{% endfor %}
+  </table></div>
+  {% if preview|length > 60 %}<p class="small muted">Se muestran 60 de {{ preview|length }} filas; se importarán todas.</p>{% endif %}
+
+  <h3 style="margin-top:16px">3. Importar</h3>
+  <div class="inline-form">
+    <label class="small">Confianza de estos datos
+      <select name="confidence"><option value="probable">Probable (planilla de terceros o sin confirmar)</option><option value="verificado">Verificado (base propia del estudio, confirmada)</option></select></label>
+    <label class="small"><input type="checkbox" name="create_new" value="1" checked> Crear las empresas nuevas</label>
+    <button class="btn primary" name="action" value="import">Importar {{ sheet.rows|length }} filas</button>
+  </div>
+</form>
+
+{% elif props is defined %}
+<form method="post" action="{{ url_for('main.doc_apply', did=d.id) }}">
+<div class="grid g2">
+  <div class="card tri"><h2>1. ¿A qué empresa corresponde?</h2>
+    <label class="small">Empresa registrada
+      <select name="company_id" onchange="location.href='?company_id='+this.value"><option value="">— Elegir —</option>
+        {% for c in companies %}<option value="{{ c.id }}" {{ 'selected' if cid==c.id }}>{{ c.name }}</option>{% endfor %}</select></label>
+    {% if found %}<p class="small">Mencionadas en el documento: {% for f in found %}<a href="?company_id={{ f.id }}">{{ f.name }}</a>{{ ', ' if not loop.last }}{% endfor %}</p>{% endif %}
+    <p class="small muted" style="margin-top:12px">…o cree una empresa nueva:</p>
+    <input name="new_company" placeholder="Nombre de la empresa" list="detected" style="width:100%">
+    <datalist id="detected">{% for n in detected %}<option>{{ n }}</option>{% endfor %}</datalist>
+    {% if detected %}<p class="small muted">Detectadas en el texto: {{ detected|join(', ') }}</p>{% endif %}
+  </div>
+  <div class="card"><h2>Texto leído</h2><div class="doctext">{{ d.extracted_text }}</div></div>
+</div>
+<div class="card table-wrap"><h2>2. Seleccione los datos a incorporar</h2>
+  {% if props %}
+  <table><tr><th></th><th>Dato</th><th>Valor encontrado</th><th>Valor actual en la ficha</th><th>Evidencia (texto del documento)</th></tr>
+  {% for p in props %}<tr>
+    <td><input type="checkbox" name="sel" value="{{ loop.index0 }}" checked></td>
+    <td>{{ p.label }}</td><td><b>{{ p.value }}</b></td>
+    <td class="small">{% if p.target=='company' and current %}{{ current.get(p.field) or '—' }}{% if current.get(p.field) and current.get(p.field)|lower != p.value|lower %} <span class="badge b-probable">distinto</span>{% endif %}{% else %}—{% endif %}</td>
+    <td class="small muted">{{ p.evidence }}</td></tr>{% endfor %}
+  </table>
+  <div class="inline-form" style="margin-top:12px">
+    <label class="small">Confianza <select name="confidence"><option value="probable">Probable</option><option value="verificado">Verificado</option></select></label>
+    <button class="btn primary">Incorporar seleccionados</button>
+  </div>
+  <p class="small muted">Sólo se proponen datos escritos literalmente en el documento. Si un valor difiere del actual, el anterior se conserva en el historial.</p>
+  {% else %}<p class="empty">No se encontraron datos estructurados (correos, teléfonos, ejecutivos, proyectos). Puede registrarlos manualmente en la ficha usando este documento como fuente.</p>{% endif %}
+</div>
+</form>
+{% else %}
+<div class="card"><p class="empty">No hay contenido que revisar para este documento.</p></div>
+{% endif %}
+{% endblock %}

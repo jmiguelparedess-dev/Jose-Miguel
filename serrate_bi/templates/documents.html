@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Documentos{% endblock %}
+{% block content %}
+<div class="topbar"><div class="title-block" data-wm="documentos"><h1 class="lower">documentos</h1>
+  <p class="sub">Suba planillas de clientes, PDF o fotos (por ejemplo tarjetas de presentación) para actualizar fichas. Primero verá una vista previa; nada se guarda sin su confirmación, y el archivo queda como fuente de cada dato.</p></div></div>
+
+<div class="grid g2">
+  <form class="card tri" method="post" action="{{ url_for('main.docs_upload') }}" enctype="multipart/form-data">
+    <h2>Subir documentos</h2>
+    <div class="dropzone" id="dropzone">
+      <div class="eyebrow">Excel · CSV · PDF · JPG · PNG · TXT — hasta 25 MB por archivo</div>
+      <input type="file" name="files" multiple required accept=".xlsx,.xlsm,.csv,.pdf,.jpg,.jpeg,.png,.webp,.gif,.txt">
+      <div class="small muted">Puede seleccionar varios archivos a la vez.</div>
+    </div>
+    <div class="form-grid" style="margin-top:12px">
+      <label class="full">Asociar a una empresa (opcional; útil para PDF y fotos)
+        <select name="company_id"><option value="">— Decidir al revisar —</option>
+          {% for c in companies %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></label>
+    </div>
+    <div class="actions" style="margin-top:12px"><button class="btn primary" type="submit">Subir y analizar</button></div>
+  </form>
+  <div class="card"><h2>Qué hace con cada tipo de archivo</h2>
+    <table>
+      <tr><td><b>Excel / CSV</b></td><td>Reconoce columnas como Empresa, Ciudad, Web, Correo, Teléfono, Gerente, Cargo, LinkedIn y Notas. Usted confirma el mapeo; se actualizan las empresas existentes (sin duplicar) y se crean las nuevas.</td></tr>
+      <tr><td><b>PDF</b></td><td>Lee el texto y propone datos literales: correos, teléfonos, ejecutivos con cargo, proyectos, web, LinkedIn.</td></tr>
+      <tr><td><b>Fotos</b></td><td>Transcribe el texto (tarjetas, folletos, carteles de obra) y propone los datos encontrados.
+        {% if not ocr_available %}<br><span class="badge b-probable">Requiere ANTHROPIC_API_KEY (o Tesseract) para leer fotos y PDF escaneados</span>{% endif %}</td></tr>
+    </table>
+    <p class="small muted">Nivel de confianza: usted lo elige al importar (por defecto «probable»). Si un dato contradice uno existente, el anterior no se borra: queda en el historial o como valor alternativo.</p>
+  </div>
+</div>
+
+<div class="card table-wrap"><h2>Documentos subidos</h2>
+  <table><tr><th>Archivo</th><th>Tipo</th><th>Empresa</th><th>Estado</th><th>Incorporado</th><th>Subido</th><th></th></tr>
+  {% for d in rows %}<tr>
+    <td><a href="{{ url_for('main.doc_review', did=d.id) }}"><b>{{ d.filename }}</b></a><div class="small muted">{{ (d.size/1024)|round(0)|int }} KB{% if d.extraction_method %} · {{ d.extraction_method }}{% endif %}</div></td>
+    <td>{{ d.kind }}</td>
+    <td>{% if d.company_id %}<a href="{{ url_for('main.company_detail', cid=d.company_id) }}#documentos">{{ d.company }}</a>{% else %}<span class="muted">—</span>{% endif %}</td>
+    <td><span class="badge {{ 'b-verificado' if d.status=='procesado' else 'b-probable' if d.status in ('requiere OCR','sin datos') else 'b-nd' if d.status=='error' else 'b-muted' }}">{{ d.status }}</span></td>
+    <td class="small">{{ d.applied_summary or '—' }}</td>
+    <td class="small">{{ d.uploaded_at|fecha(true) }}</td>
+    <td><a class="btn sm" href="{{ url_for('main.doc_review', did=d.id) }}">Revisar</a></td></tr>
+  {% else %}<tr><td colspan="7" class="empty">Aún no se subieron documentos.</td></tr>{% endfor %}</table>
+</div>
+{% endblock %}

@@ -11,6 +11,9 @@ inmobiliarias y empresas de infraestructura en Bolivia** (prioridad: Santa Cruz,
 - **CRM** con los 10 estados del embudo, comentarios, reuniones y fechas de seguimiento.
 - **Actualización semanal** automática con historial de qué cambió y cuándo.
 - **Exportación a Excel** (una hoja por entidad, con fuentes y confianza).
+- **Carga de documentos**: planillas Excel/CSV de clientes, PDF y fotos (tarjetas, folletos) para actualizar fichas,
+  con vista previa y confirmación; el archivo queda como fuente de cada dato.
+- Diseño basado en la presentación institucional 2026 del estudio.
 
 Arquitectura y reglas de calidad: [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md).
 
@@ -37,6 +40,7 @@ copie ese archivo o use **Exportar a Excel**.
 | `ANTHROPIC_API_KEY` | Búsqueda asistida con Claude (búsqueda web del servidor + verificación) y redacción de contactos. Modelo por defecto `claude-opus-5-5` (cambiar con `SERRATE_BI_CLAUDE_MODEL`). |
 | `BRAVE_API_KEY` | Buscador web Brave Search (más estable que el buscador gratuito). |
 | `GOOGLE_CSE_KEY` + `GOOGLE_CSE_CX` | Google Programmable Search. |
+| (Tesseract instalado + `pip install pytesseract`) | Alternativa local para leer fotos sin Claude. |
 
 Sin claves la aplicación funciona con DuckDuckGo, Google News y Bing News, y la lectura de sitios oficiales.
 
@@ -48,7 +52,10 @@ Sin claves la aplicación funciona con DuckDuckGo, Google News y Bing News, y la
 3. Revise **Análisis comercial** y pulse **GENERAR CONTACTO**. Edite, **apruebe**, envíe desde su correo
    («Abrir en mi correo») o LinkedIn, y **marque como enviado**: el CRM pasa a «Contactado».
 4. Registre llamadas, reuniones y fechas de seguimiento en **Seguimiento**. El panel muestra pendientes.
-5. **Actualizaciones** muestra los datos modificados, proyectos y noticias nuevas de cada semana.
+5. **Documentos**: suba una planilla de clientes (se reconocen columnas como Empresa, Ciudad, Correo, Teléfono,
+   Gerente, Cargo, Notas), un PDF o la foto de una tarjeta. Revise la vista previa, elija qué incorporar y con qué
+   confianza. Las fotos y PDF escaneados requieren `ANTHROPIC_API_KEY` (o Tesseract instalado) para leerse.
+6. **Actualizaciones** muestra los datos modificados, proyectos y noticias nuevas de cada semana.
 
 ## Línea de comandos (programar con cron / Programador de tareas)
 

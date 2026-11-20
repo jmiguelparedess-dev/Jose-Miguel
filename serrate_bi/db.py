@@ -8,6 +8,7 @@ Las tablas separan explícitamente:
   - projects / news                  -> proyectos y actividad reciente
   - activities / outreach_drafts     -> actividad comercial (CRM) y borradores de contacto
   - change_log                       -> qué dato cambió, cuándo y por qué
+  - documents                        -> archivos subidos (Excel, PDF, fotos) usados como fuente
   - research_runs                    -> trabajos de investigación / actualización
 """
 import os
@@ -193,6 +194,28 @@ CREATE TABLE IF NOT EXISTS outreach_drafts (
     approved_at TEXT,
     sent_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS documents (
+    id INTEGER PRIMARY KEY,
+    company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL,
+    filename TEXT NOT NULL,
+    stored_name TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    mime TEXT,
+    size INTEGER,
+    sha256 TEXT NOT NULL,
+    status TEXT NOT NULL,
+    extraction_method TEXT,
+    extracted_text TEXT,
+    table_json TEXT,
+    message TEXT,
+    source_id INTEGER REFERENCES sources(id),
+    uploaded_at TEXT NOT NULL,
+    processed_at TEXT,
+    applied_at TEXT,
+    applied_summary TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_documents_company ON documents(company_id);
 
 CREATE TABLE IF NOT EXISTS research_runs (
     id INTEGER PRIMARY KEY,

@@ -32,7 +32,7 @@
 {% block content %}
 {% if active_run %}<span data-watch-run="{{ active_run.id }}"></span>{% endif %}
 <div class="topbar">
-  <div>
+  <div class="title-block" data-wm="{{ (c.sector or 'empresa').split()[0]|lower }}">
     <h1>{{ c.name }} {{ score(c.score) }}</h1>
     <p class="sub">{{ c.sector or 'Sector pendiente' }} · {{ c.city or 'Ciudad pendiente' }}{% if c.department %} ({{ c.department }}){% endif %}
       · <span class="badge b-status">{{ c.crm_status }}</span>
@@ -56,7 +56,7 @@
   <a href="#datos">Datos</a><a href="#ejecutivos">Ejecutivos ({{ execs|length }})</a><a href="#analisis">Análisis comercial</a>
   <a href="#proyectos">Proyectos ({{ projects|length }})</a><a href="#actividad">Noticias ({{ news|length }})</a>
   <a href="#contacto">Contacto ({{ drafts|length }})</a><a href="#crm">Seguimiento</a>
-  <a href="#fuentes">Fuentes ({{ sources|length }})</a><a href="#historial">Historial</a>
+  <a href="#documentos">Documentos ({{ docs|length }})</a>  <a href="#fuentes">Fuentes ({{ sources|length }})</a><a href="#historial">Historial</a>
 </nav>
 
 <section class="tab" id="tab-datos">
@@ -239,6 +239,20 @@
       {% else %}<p class="empty">Sin actividad registrada.</p>{% endif %}
     </div>
   </div>
+</section>
+
+<section class="tab" id="tab-documentos">
+  <form class="card" method="post" action="{{ url_for('main.docs_upload') }}" enctype="multipart/form-data">
+    <h2>Subir documento de esta empresa</h2>
+    <p class="small muted">Tarjetas de presentación, folletos de proyectos, PDF de propuestas o planillas. Verá los datos encontrados antes de incorporarlos.</p>
+    <input type="hidden" name="company_id" value="{{ c.id }}"><input type="hidden" name="next" value="{{ url_for('main.company_detail', cid=c.id) }}#documentos">
+    <div class="inline-form"><input type="file" name="files" multiple required accept=".xlsx,.xlsm,.csv,.pdf,.jpg,.jpeg,.png,.webp,.gif,.txt">
+      <button class="btn primary">Subir y analizar</button></div>
+  </form>
+  <div class="card table-wrap"><table><tr><th>Archivo</th><th>Tipo</th><th>Estado</th><th>Incorporado</th><th>Subido</th></tr>
+    {% for d in docs %}<tr><td><a href="{{ url_for('main.doc_review', did=d.id) }}">{{ d.filename }}</a></td><td>{{ d.kind }}</td>
+      <td><span class="badge b-muted">{{ d.status }}</span></td><td class="small">{{ d.applied_summary or '—' }}</td><td class="small">{{ d.uploaded_at|fecha(true) }}</td></tr>
+    {% else %}<tr><td colspan="5" class="empty">Sin documentos.</td></tr>{% endfor %}</table></div>
 </section>
 
 <section class="tab" id="tab-fuentes">

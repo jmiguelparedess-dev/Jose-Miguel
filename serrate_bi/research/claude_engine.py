@@ -198,3 +198,22 @@ def draft_outreach(facts: dict):
         raise ClaudeUnavailable("Claude rechazó la solicitud.")
     text = "\n".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
     return parse_json_block(text)
+
+
+def transcribe(data: bytes, media_type: str) -> str:
+    """OCR: transcribe literalmente el texto de una foto o de un PDF escaneado. No interpreta ni completa."""
+    import base64
+    client = _client()
+    b64 = base64.standard_b64encode(data).decode()
+    if media_type == "application/pdf":
+        block = {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": b64}}
+    else:
+        block = {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64}}
+    prompt = ("Transcribe literalmente todo el texto visible en este documento, respetando los saltos de línea. "
+              "No resumas, no corrijas, no completes datos ilegibles (escribe [ilegible]) y no agregues nada que no "
+              "esté escrito. Responde sólo con la transcripción.")
+    resp = _create(client, model=MODEL, max_tokens=16000, output_config={"effort": "low"},
+                   messages=[{"role": "user", "content": [block, {"type": "text", "text": prompt}]}])
+    if resp.stop_reason == "refusal":
+        raise ClaudeUnavailable("Claude rechazó la solicitud.")
+    return "\n".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()

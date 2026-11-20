@@ -3,7 +3,7 @@
 {% block title %}Empresas{% endblock %}
 {% block content %}
 <div class="topbar">
-  <div><h1>Empresas</h1><p class="sub">{{ rows|length }} resultado(s)</p></div>
+  <div class="title-block" data-wm="empresas"><h1 class="lower">empresas</h1><p class="sub">{{ rows|length }} resultado(s)</p></div>
   <div class="actions">
     <a class="btn" href="{{ url_for('main.export_xlsx', **request.args) }}">⤓ Exportar selección a Excel</a>
     <a class="btn primary" href="{{ url_for('main.company_new') }}">＋ Nueva empresa</a>

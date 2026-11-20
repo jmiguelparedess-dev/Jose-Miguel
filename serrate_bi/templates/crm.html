@@ -2,7 +2,7 @@
 {% from "_macros.html" import score with context %}
 {% block title %}Seguimiento CRM{% endblock %}
 {% block content %}
-<div class="topbar"><div><h1>Seguimiento comercial</h1><p class="sub">Embudo por estado. Cambie el estado desde cada tarjeta o desde la ficha.</p></div></div>
+<div class="topbar"><div class="title-block" data-wm="seguimiento"><h1 class="lower">seguimiento comercial</h1><p class="sub">Embudo por estado. Cambie el estado desde cada tarjeta o desde la ficha.</p></div></div>
 <div class="kanban">
 {% for status, rows in columns.items() %}
   <div class="kcol"><h3><span>{{ status }}</span><span>{{ rows|length }}</span></h3>

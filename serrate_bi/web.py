@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 from flask import (Blueprint, abort, current_app, flash, g, jsonify, redirect, render_template, request,
                    send_file, url_for)
 
-from . import analysis, export, outreach
+from . import analysis, documents, export, outreach
 from . import quality as q
 from . import repo
 from .db import get_setting, now_iso, set_setting, transaction
@@ -35,6 +35,7 @@ def register_filters(app):
                 "COMPANY_FIELDS": q.COMPANY_FIELDS, "EXECUTIVE_FIELDS": q.EXECUTIVE_FIELDS,
                 "CONFIDENCE_HELP": q.CONFIDENCE_HELP, "ACTIVITY_KINDS": q.ACTIVITY_KINDS,
                 "CHANNELS": outreach.CHANNELS, "claude_available": claude_engine.available(),
+                "TARGET_LABELS": documents.TARGET_LABELS, "ocr_available": documents.ocr_available(),
                 "today": date.today().isoformat()}
 
 
@@ -159,13 +160,14 @@ def company_detail(cid):
                          "AND s.id NOT IN (SELECT source_id FROM facts WHERE company_id=? AND source_id IS NOT NULL) "
                          "ORDER BY last_retrieved_at DESC", (cid, cid, cid, cid)).fetchall()
     runs = db.execute("SELECT * FROM research_runs WHERE company_id=? ORDER BY id DESC LIMIT 5", (cid,)).fetchall()
+    docs = db.execute("SELECT * FROM documents WHERE company_id=? ORDER BY id DESC", (cid,)).fetchall()
     active_run = next((r for r in runs if r["status"] in ("en cola", "en curso")), None)
     a = json.loads(c["analysis_json"]) if c["analysis_json"] else None
     missing = q.missing_fields(c, bool(execs))
     return render_template("company_detail.html", c=c, execs=execs, exec_states=exec_states, exec_alts=exec_alts,
                            states=states, alts=alts, projects=projects, news=news, activities=activities,
                            drafts=drafts, changes=changes, sources=sources, runs=runs, active_run=active_run,
-                           a=a, missing=missing)
+                           a=a, missing=missing, docs=docs)
 
 
 @bp.post("/empresas/<int:cid>/campo")
@@ -468,3 +470,134 @@ def export_xlsx():
     name = f"serrate_paz_prospectos_{date.today().isoformat()}.xlsx"
     return send_file(buf, as_attachment=True, download_name=name,
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+# =========================================================================== DOCUMENTOS
+@bp.route("/documentos")
+def docs_list():
+    rows = g.db.execute("SELECT d.*, c.name AS company FROM documents d LEFT JOIN companies c ON c.id=d.company_id "
+                        "ORDER BY d.id DESC LIMIT 200").fetchall()
+    companies_ = g.db.execute("SELECT id, name FROM companies WHERE archived=0 ORDER BY name COLLATE NOCASE").fetchall()
+    return render_template("documents.html", rows=rows, companies=companies_)
+
+
+@bp.post("/documentos/subir")
+def docs_upload():
+    files = [f for f in request.files.getlist("files") if f and f.filename]
+    company_id = int(request.form["company_id"]) if request.form.get("company_id") else None
+    back = request.form.get("next") or url_for("main.docs_list")
+    if not files:
+        flash("Seleccione al menos un archivo.", "error")
+        return redirect(back)
+    ids = []
+    for f in files:
+        try:
+            with transaction(g.db):
+                did, created = documents.save_upload(g.db, current_app.config["DB_PATH"], f.filename, f.read(),
+                                                     company_id)
+            if created:
+                status = documents.process(g.db, current_app.config["DB_PATH"], did)
+                flash(f"«{f.filename}»: {status}.", "success" if status == "procesado" else "warning")
+            else:
+                flash(f"«{f.filename}» ya había sido subido; se abre el existente.", "warning")
+            ids.append(did)
+        except documents.DocumentError as e:
+            flash(f"«{f.filename}»: {e}", "error")
+    if len(ids) == 1:
+        return redirect(url_for("main.doc_review", did=ids[0]))
+    return redirect(back)
+
+
+def _doc_or_404(did):
+    d = g.db.execute("SELECT d.*, c.name AS company FROM documents d LEFT JOIN companies c ON c.id=d.company_id "
+                     "WHERE d.id=?", (did,)).fetchone()
+    if not d:
+        abort(404)
+    return d
+
+
+@bp.route("/documentos/<int:did>", methods=["GET", "POST"])
+def doc_review(did):
+    d = _doc_or_404(did)
+    ctx = {"d": d}
+    companies_ = g.db.execute("SELECT id, name FROM companies WHERE archived=0 ORDER BY name COLLATE NOCASE").fetchall()
+    ctx["companies"] = companies_
+    if d["kind"] == "tabla" and d["table_json"]:
+        table = json.loads(d["table_json"])
+        si = int(request.values.get("sheet", 0) or 0)
+        si = si if 0 <= si < len(table["sheets"]) else 0
+        sheet = table["sheets"][si] if table["sheets"] else None
+        if sheet:
+            mapping = [request.form.get(f"m{i}", m) if request.method == "POST" else m
+                       for i, m in enumerate(sheet["mapping"])]
+            mapping = [m if m in documents.TARGET_LABELS else "" for m in mapping]
+            if request.method == "POST" and request.form.get("action") == "import":
+                if "name" not in mapping:
+                    flash("Indique qué columna contiene el nombre de la empresa.", "error")
+                else:
+                    conf = request.form.get("confidence") if request.form.get("confidence") in (q.VERIFICADO, q.PROBABLE) else q.PROBABLE
+                    with transaction(g.db):
+                        stats = documents.import_table(g.db, d, sheet, mapping, conf,
+                                                       request.form.get("create_new") == "1")
+                        summary = ", ".join(f"{v} {k.replace('_', ' ')}" for k, v in stats.items() if v) or "sin cambios"
+                        g.db.execute("UPDATE documents SET applied_at=?, applied_summary=? WHERE id=?",
+                                     (now_iso(), summary, did))
+                    flash(f"Importación terminada: {summary}.", "success")
+                    return redirect(url_for("main.doc_review", did=did))
+            preview = documents.preview_table(g.db, sheet, mapping)
+            ctx.update(table=table, sheet=sheet, si=si, mapping=mapping, preview=preview,
+                       n_new=sum(1 for p in preview if p["name"] and not p.get("existing_id")),
+                       n_upd=sum(1 for p in preview if p.get("existing_id")),
+                       n_skip=sum(1 for p in preview if not p["name"]))
+    elif d["extracted_text"]:
+        found, detected = documents.suggest_companies(g.db, d["extracted_text"])
+        cid = request.values.get("company_id") or d["company_id"] or (found[0]["id"] if found else None)
+        cid = int(cid) if cid else None
+        props = documents.proposals_from_text(d["extracted_text"])
+        current = {}
+        if cid:
+            c = repo.get_company(g.db, cid)
+            current = {f: c[f] for f in q.COMPANY_FIELDS}
+        ctx.update(props=props, found=found, detected=detected, cid=cid, current=current)
+    return render_template("document_review.html", **ctx)
+
+
+@bp.post("/documentos/<int:did>/aplicar")
+def doc_apply(did):
+    d = _doc_or_404(did)
+    fm = request.form
+    props = documents.proposals_from_text(d["extracted_text"] or "")
+    selected = [props[int(i)] for i in fm.getlist("sel") if i.isdigit() and int(i) < len(props)]
+    conf = fm.get("confidence") if fm.get("confidence") in (q.VERIFICADO, q.PROBABLE) else q.PROBABLE
+    cid = int(fm["company_id"]) if fm.get("company_id") else None
+    new_name = (fm.get("new_company") or "").strip()
+    if not selected:
+        flash("No seleccionó ningún dato.", "warning")
+        return redirect(url_for("main.doc_review", did=did))
+    with transaction(g.db):
+        if not cid and new_name:
+            cid, created = repo.create_company(g.db, new_name, origin="documento", source_id=d["source_id"],
+                                               confidence=conf)
+            if not created:
+                flash(f"La empresa ya existía como «{repo.get_company(g.db, cid)['name']}»; se actualizó esa ficha.", "warning")
+        if not cid:
+            flash("Elija la empresa a la que corresponden los datos (o escriba el nombre de una nueva).", "error")
+            return redirect(url_for("main.doc_review", did=did))
+        n = documents.apply_proposals(g.db, d, cid, selected, conf)
+    flash(f"Se incorporaron {n} dato(s) a la ficha. Los valores anteriores se conservan en el historial.", "success")
+    return redirect(url_for("main.company_detail", cid=cid) + "#datos")
+
+
+@bp.post("/documentos/<int:did>/reprocesar")
+def doc_reprocess(did):
+    _doc_or_404(did)
+    status = documents.process(g.db, current_app.config["DB_PATH"], did)
+    flash(f"Documento reprocesado: {status}.", "success" if status == "procesado" else "warning")
+    return redirect(url_for("main.doc_review", did=did))
+
+
+@bp.route("/documentos/<int:did>/archivo")
+def doc_file(did):
+    d = _doc_or_404(did)
+    return send_file(documents.file_path(current_app.config["DB_PATH"], d), mimetype=d["mime"],
+                     download_name=d["filename"], as_attachment=d["kind"] == "tabla")

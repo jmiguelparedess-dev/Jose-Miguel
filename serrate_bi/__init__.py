@@ -13,6 +13,7 @@ def create_app(db_path=None, start_jobs=True, testing=False):
     app = Flask(__name__)
     app.config["DB_PATH"] = db_path or default_db_path()
     app.config["TESTING"] = testing
+    app.config["MAX_CONTENT_LENGTH"] = 60 * 1024 * 1024
     app.secret_key = os.environ.get("SERRATE_BI_SECRET", "serrate-bi-local")
     init_db(app.config["DB_PATH"])
     app.jobs = JobRunner(app.config["DB_PATH"])

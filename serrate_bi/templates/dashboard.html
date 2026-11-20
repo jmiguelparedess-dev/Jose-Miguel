@@ -3,7 +3,7 @@
 {% block title %}Panel{% endblock %}
 {% block content %}
 <div class="topbar">
-  <div><h1>Panel de prospección</h1>
+  <div class="title-block" data-wm="prospección"><h1 class="lower">panel de prospección</h1>
     <p class="sub">Constructoras, desarrolladoras, promotoras inmobiliarias e infraestructura en Bolivia.</p></div>
   <div class="actions">
     <a class="btn" href="{{ url_for('main.research') }}">⌕ Buscar nuevas empresas</a>
@@ -11,15 +11,19 @@
   </div>
 </div>
 
+<div class="hero"><div class="in"><div class="eyebrow" style="color:#DCE7F2">Construcción · Desarrollo inmobiliario · Infraestructura</div>
+  <div class="big">inteligencia comercial</div>
+  <div class="small">Empresas bolivianas con proyectos, inversiones y obras en curso: datos con fuente, análisis de necesidades jurídicas y seguimiento comercial.</div></div></div>
+
 <div class="grid g4">
-  <div class="card kpi"><div class="v">{{ total }}</div><div class="l">Empresas registradas</div></div>
-  <div class="card kpi accent"><div class="v">{{ priority|length }}</div><div class="l">Prospectos prioritarios (≥70)</div></div>
-  <div class="card kpi"><div class="v">{{ (by_status.get('Pendiente de contacto',0)) }}</div><div class="l">Pendientes de contacto</div></div>
-  <div class="card kpi"><div class="v">{{ by_status.get('Reunión solicitada',0) }}</div><div class="l">Reuniones solicitadas</div></div>
-  <div class="card kpi"><div class="v">{{ by_status.get('Reunión confirmada',0) + by_status.get('Reunión realizada',0) }}</div><div class="l">Reuniones confirmadas / realizadas</div></div>
-  <div class="card kpi"><div class="v">{{ by_status.get('Cliente',0) }}</div><div class="l">Clientes</div></div>
-  <div class="card kpi"><div class="v">{{ n_incomplete }}</div><div class="l">Fichas incompletas</div></div>
-  <div class="card kpi"><div class="v">{{ changes_week }}</div><div class="l">Cambios en 7 días</div>
+  <div class="card kpi tri"><div class="v">{{ total }}</div><div class="l">Empresas registradas</div></div>
+  <div class="card kpi accent tri"><div class="v">{{ priority|length }}</div><div class="l">Prospectos prioritarios (≥70)</div></div>
+  <div class="card kpi tri"><div class="v">{{ (by_status.get('Pendiente de contacto',0)) }}</div><div class="l">Pendientes de contacto</div></div>
+  <div class="card kpi tri"><div class="v">{{ by_status.get('Reunión solicitada',0) }}</div><div class="l">Reuniones solicitadas</div></div>
+  <div class="card kpi tri"><div class="v">{{ by_status.get('Reunión confirmada',0) + by_status.get('Reunión realizada',0) }}</div><div class="l">Reuniones confirmadas / realizadas</div></div>
+  <div class="card kpi tri"><div class="v">{{ by_status.get('Cliente',0) }}</div><div class="l">Clientes</div></div>
+  <div class="card kpi tri"><div class="v">{{ n_incomplete }}</div><div class="l">Fichas incompletas</div></div>
+  <div class="card kpi tri"><div class="v">{{ changes_week }}</div><div class="l">Cambios en 7 días</div>
     <div class="small muted">Última actualización semanal: {{ last_weekly|fecha }}</div></div>
 </div>
 

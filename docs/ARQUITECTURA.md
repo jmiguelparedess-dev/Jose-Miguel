@@ -14,6 +14,7 @@ cada dato con su fuente, evaluar su potencial como clientes y gestionar el conta
 | **Confianza explícita** | `verificado` · `probable` · `no disponible`, con reglas fijas (ver §4). |
 | **Sin envíos automáticos** | Los mensajes se generan como **borradores**. El usuario los aprueba, los envía desde su propio correo/LinkedIn y los marca como enviados. |
 | **Funciona sin claves de API** | Buscadores y noticias gratuitos por defecto; Claude y Brave/Google son mejoras opcionales. |
+| **Identidad visual** | Paleta, tipografía (Montserrat), títulos en minúscula con marca de agua y triángulos de esquina tomados de la presentación institucional 2026. |
 | **Persistencia robusta** | SQLite en modo WAL: cada cambio se escribe al instante; un trabajo interrumpido se marca al reiniciar. |
 
 ## 2. Componentes
@@ -58,6 +59,7 @@ cada dato con su fuente, evaluar su potencial como clientes y gestionar el conta
 | `outreach_drafts` | Borradores de contacto (correo, LinkedIn, reunión, argumento) con los hechos en que se basan y su estado. |
 | `change_log` | Qué dato cambió, cuándo, valor anterior y nuevo, confianza, origen y fuente. |
 | `research_runs` | Trabajos de investigación/actualización con log y estadísticas. |
+| `documents` | Archivos subidos (Excel/CSV, PDF, fotos): hash, texto o tabla extraídos, estado, resumen de lo incorporado. Cada documento es una fuente (`sources.source_type = 'documento'`). |
 
 ## 4. Reglas de calidad
 
@@ -102,6 +104,13 @@ y comprueba que el valor aparezca para decidir entre verificado y probable.
 - **GENERAR CONTACTO**: requiere al menos un proyecto o noticia documentada (si no, se niega: el mensaje sería
   genérico). Los mensajes externos se apoyan en proyectos/inversiones; las noticias de conflicto sólo aparecen en
   el argumento interno, marcadas como sensibles.
+
+- **Documentos**: el archivo se guarda en `data/uploads` (deduplicado por hash). Excel/CSV: se detecta la fila de
+  encabezados y se mapean columnas por sinónimos; el usuario confirma el mapeo y ve, fila por fila, si se crea una
+  empresa o se actualiza una existente (misma deduplicación). PDF/foto/texto: se obtiene el texto (pypdf; OCR con
+  Claude o Tesseract para fotos y escaneos — el OCR sólo transcribe) y los mismos extractores deterministas proponen
+  datos literales con su línea de evidencia. Nada se aplica sin selección explícita; las reglas de `record_fact`
+  deciden si el dato es nuevo, reconfirma, reemplaza o queda como alternativo.
 
 ## 6. Limitaciones conocidas de la v1
 
