@@ -24,7 +24,7 @@ Requisitos: Python 3.10 o superior.
 ```bash
 python -m venv .venv
 # Windows: .venv\Scripts\activate      macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt   # (para pruebas: requirements-dev.txt)
 python run.py
 ```
 
@@ -69,6 +69,7 @@ python -m serrate_bi.cli exportar prospectos.xlsx
 ## Pruebas
 
 ```bash
+pip install -r requirements-dev.txt
 pytest -q
 ```
 
